@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions targetNamespace="http://linkcare.es/LINKCARE"
+                  xmlns="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:apachesoap="http://xml.apache.org/xml-soap"
+                  xmlns:intf="http://linkcare.es/LINKCARE"
+                  xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/"
+                  xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:wsdlsoap="http://schemas.xmlsoap.org/wsdl/soap/"
+                  xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+    <wsdl:message name="training_summaryRequest">
+        <wsdl:part name="admission" type="xsd:string"/>
+        <wsdl:part name="summary_form" type="xsd:string"/>
+        <wsdl:part name="from_date" type="xsd:string"/>
+        <wsdl:part name="to_date" type="xsd:string"/>
+    </wsdl:message>
+    <wsdl:message name="training_summaryResponse">
+        <wsdl:part name="result" type="xsd:string"/>
+        <wsdl:part name="ErrorMsg" type="xsd:string"/>
+    </wsdl:message>
+
+    <wsdl:portType name="LINKCARE">
+        <wsdl:operation name="training_summary" parameterOrder="admission summary_form from_date to_date result ErrorMsg">
+            <wsdl:input message="intf:training_summaryRequest" name="training_summaryRequest"/>
+            <wsdl:output message="intf:training_summaryResponse" name="training_summaryResponse"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+    <wsdl:binding name="LINKCARESoapBinding" type="intf:LINKCARE">
+        <wsdlsoap:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
+
+        <wsdl:operation name="training_summary">
+            <wsdlsoap:operation soapAction="LINKCARE#training_summary"/>
+            <wsdl:input name="training_summaryRequest">
+                <wsdlsoap:body
+                        encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+                        namespace="http://linkcare.es/LINKCARE"
+                        use="encoded"/>
+            </wsdl:input>
+            <wsdl:output name="training_summaryResponse">
+                <wsdlsoap:body encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+                               namespace="http://linkcare.es/LINKCARE"
+                               use="encoded"/>
+            </wsdl:output>
+        </wsdl:operation>
+
+    </wsdl:binding>
+    <wsdl:service name="LINKCARE">
+        <wsdl:port binding="intf:LINKCARESoapBinding" name="LINKCARE">
+            <wsdlsoap:address location="https://demo-api.linkcare.es/services/workflow/BRCA/Server.php"/>
+        </wsdl:port>
+    </wsdl:service>
+</wsdl:definitions>
