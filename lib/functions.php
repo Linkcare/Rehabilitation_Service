@@ -1,4 +1,16 @@
 <?php
+// Constants to define the compliance of a patient
+const COMPLIANCE_NOT_ENOUGH_DATA = 0;
+const COMPLIANCE_GREEN = 1;
+const COMPLIANCE_YELLOW = 2;
+const COMPLIANCE_RED = 3;
+
+// Constants to define the effort employed to do an execrice
+const EFFORT_UNKNOWN = 0;
+const EFFORT_LOW = 1;
+const EFFORT_MODERATE = 2;
+const EFFORT_HIGH = 3;
+const EFFORT_VERY_HIGH = 4;
 
 /**
  * Generate a summary of the exercices performed by a patient in a date range
@@ -39,6 +51,73 @@ function trainingSummary($admissionId, $summaryFormId, $fromDate, $toDate) {
     updateTrainingSummary($targetForm, $summary);
 
     return ['ErrorMsg' => '', 'ErrorCode' => ''];
+}
+
+/**
+ * Calculate the compliance of a patient in the Digital Trainer PROGRAM.
+ * This function checks whether the patient is executing the scheduled exercices and how well is doing.<br>
+ * The return value is a number:
+ * <ul>
+ * <li>0: Not enough information to calculate compliance</li>
+ * <li>1 (green): The last scheduled exercise was done without difficulty</li>
+ * <li>3 (red): The patient is not doing well. One of the following situations is happening:
+ * <ul>
+ * <li>The last scheduled training exercises is not complete and the penultimate is expired</li>
+ * <li>The last scheduled training exercises has been completed but with very high effort</li>
+ * </ul>
+ * </li>
+ * <li>2 (yellow): Any other case</li>
+ * </ul>
+ *
+ * @param string $admission
+ * @param string $date
+ * @return string[]
+ */
+function calculateCompliance($admissionId, $date) {
+    $api = LinkcareSoapAPI::getInstance();
+
+    log_trace("CALCULATE COMPLIANCE . Date: $date,  Admission: $admissionId");
+
+    $admission = $api->admission_get($admissionId);
+
+    // Search the training TASKS in the date range specified
+    $filter = new TaskFilter();
+    $filter->setObjectType('TASKS');
+    $filter->setToDate($date);
+    $filter->setTaskCodes($GLOBALS['TASK_CODES']['TRAINING_EXERCISES']);
+    // Find the 2 last exercise sessions
+    $trainingTasks = $admission->getTaskList(2, 0, $filter, false);
+    if (count($trainingTasks) == 0) {
+        return ['result' => COMPLIANCE_NOT_ENOUGH_DATA, 'ErrorMsg' => '', 'ErrorCode' => ''];
+    }
+
+    $lastTrainingTask = $trainingTasks[0];
+    $penultimateTrainingTask = count($trainingTasks) > 1 ? $trainingTasks[1] : null;
+
+    $effort = EFFORT_UNKNOWN;
+    if ($lastTrainingTask->isClosed()) {
+        $effort = extractTrainingEffort($lastTrainingTask);
+    }
+
+    // GREEN COMPLIANCE
+    if ($lastTrainingTask->isClosed() && $effort <= EFFORT_LOW) {
+        // The last exercises session was completed with no effort
+        return ['result' => COsMPLIANCE_GREEN, 'ErrorMsg' => '', 'ErrorCode' => ''];
+    }
+
+    // RED COMPLIANCE
+    if ($lastTrainingTask->isClosed() && $effort >= EFFORT_VERY_HIGH) {
+        // The last exercises session was completed with very high effort
+        return ['result' => COMPLIANCE_RED, 'ErrorMsg' => '', 'ErrorCode' => ''];
+    } elseif (($lastTrainingTask->isOpen() || $lastTrainingTask->isExpired()) && $penultimateTrainingTask && $penultimateTrainingTask->isExpired()) {
+        // The last scheduled training exercises is not complete and the penultimate is expired
+        return ['result' => COMPLIANCE_RED, 'ErrorMsg' => '', 'ErrorCode' => ''];
+    }
+
+    // YELLOW COMPLIANCE
+    // If the compliance is not GREEN nor RED, it must be yellow
+
+    return ['result' => COMPLIANCE_YELLOW, 'ErrorMsg' => '', 'ErrorCode' => ''];
 }
 
 /**
@@ -136,6 +215,29 @@ function updateTrainingSummary($targetForm, $summary) {
     if (!empty($arrQuestions)) {
         $api->form_set_all_answers($targetForm->getId(), $arrQuestions, false);
     }
+}
+
+/**
+ * Returns the maximum effort informed among all the exercises of a training session
+ *
+ * @param APITask $trainingTask
+ * @return int
+ */
+function extractTrainingEffort($trainingTask) {
+    $effort = EFFORT_UNKNOWN;
+    foreach ($trainingTask->getForms() as $f) {
+        // The FORMs with the information about the effort have a FORM_CODE like: DT_[exercise name]_CONTENT
+        if (!preg_match('/^DT_.*_CONTENT$/', $f->getFormCode())) {
+            continue;
+        }
+        if ($q = $f->findQuestion($GLOBALS['ITEM_CODES']['EFFORT'])) {
+            if ($q->getValue() > $effort) {
+                $effort = $q->getValue();
+            }
+        }
+    }
+
+    return $effort;
 }
 
 /**

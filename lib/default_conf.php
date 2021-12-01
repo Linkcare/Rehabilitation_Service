@@ -33,3 +33,6 @@ $GLOBALS['FORM_CODES']['SUMMARY'] = 'DT_SUMMARY_FORM';
  */
 $GLOBALS['ITEM_CODES']['ARRAY_EXERCISES'] = 'FECHA_EJERCICIOS';
 $GLOBALS['ITEM_CODES']['ARRAY_STRETCHING'] = 'FECHA_ESTIRAMIENTOS';
+
+// Item with the effort level informed by the patient after doing an exercise
+$GLOBALS['ITEM_CODES']['EFFORT'] = 'VAS';

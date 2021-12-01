@@ -19,10 +19,25 @@
         <wsdl:part name="ErrorMsg" type="xsd:string"/>
     </wsdl:message>
 
+    <wsdl:message name="calculate_complianceRequest">
+        <wsdl:part name="admission" type="xsd:string"/>
+        <wsdl:part name="date" type="xsd:string"/>
+    </wsdl:message>
+    <wsdl:message name="calculate_complianceResponse">
+        <wsdl:part name="result" type="xsd:string"/>
+        <wsdl:part name="ErrorMsg" type="xsd:string"/>
+    </wsdl:message>
+
+
     <wsdl:portType name="LINKCARE">
         <wsdl:operation name="training_summary" parameterOrder="admission summary_form from_date to_date result ErrorMsg">
             <wsdl:input message="intf:training_summaryRequest" name="training_summaryRequest"/>
             <wsdl:output message="intf:training_summaryResponse" name="training_summaryResponse"/>
+        </wsdl:operation>
+
+        <wsdl:operation name="calculate_compliance" parameterOrder="admission date result ErrorMsg">
+            <wsdl:input message="intf:calculate_complianceRequest" name="calculate_complianceRequest"/>
+            <wsdl:output message="intf:calculate_complianceResponse" name="calculate_complianceResponse"/>
         </wsdl:operation>
     </wsdl:portType>
 
@@ -44,7 +59,23 @@
             </wsdl:output>
         </wsdl:operation>
 
+        <wsdl:operation name="calculate_compliance">
+            <wsdlsoap:operation soapAction="LINKCARE#calculate_compliance"/>
+            <wsdl:input name="calculate_complianceRequest">
+                <wsdlsoap:body
+                        encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+                        namespace="http://linkcare.es/LINKCARE"
+                        use="encoded"/>
+            </wsdl:input>
+            <wsdl:output name="calculate_complianceResponse">
+                <wsdlsoap:body encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+                               namespace="http://linkcare.es/LINKCARE"
+                               use="encoded"/>
+            </wsdl:output>
+        </wsdl:operation>
     </wsdl:binding>
+
+
     <wsdl:service name="LINKCARE">
         <wsdl:port binding="intf:LINKCARESoapBinding" name="LINKCARE">
             <wsdlsoap:address location="https://demo-api.linkcare.es/services/workflow/BRCA/Server.php"/>

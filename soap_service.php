@@ -15,6 +15,7 @@ try {
     // Initialize SOAP Server
     $server = new SoapServer("soap_service.wsdl");
     $server->addFunction("training_summary");
+    $server->addFunction("calculate_compliance");
 
     $server->handle();
 } catch (APIException $e) {
@@ -46,6 +47,46 @@ function training_summary($admission, $summary_form, $from_date, $to_date) {
 
     try {
         $resp = trainingSummary($admission, $summary_form, $from_date, $to_date);
+        $errorMsg = $resp['ErrorMsg'];
+    } catch (APIException $e) {
+        $errorMsg = $e->getMessage();
+    } catch (Exception $e) {
+        $errorMsg = $e->getMessage();
+    }
+
+    $result = $errorMsg ? '' : $resp['result'];
+    if ($errorMsg) {
+        log_trace("ERROR: $errorMsg", 1);
+    }
+    return ['result' => $result, 'ErrorMsg' => $errorMsg];
+}
+
+/**
+ * Calculate the compliance of a patient in the Digital Trainer PROGRAM.
+ * This function checks whether the patient is executing the scheduled exercices and how well is doing.<br>
+ * The return value is a number:
+ * <ul>
+ * <li>0: Not enough information to calculate compliance</li>
+ * <li>1 (green): The last scheduled exercise was done without difficulty</li>
+ * <li>3 (red): The patient is not doing well. One of the following situations is happening:
+ * <ul>
+ * <li>The last scheduled training exercises is not complete and the penultimate is expired</li>
+ * <li>The last scheduled training exercises has been completed but with very high effort</li>
+ * </ul>
+ * </li>
+ * <li>2 (yellow): Any other case</li>
+ * </ul>
+ *
+ * @param string $admission
+ * @param string $date
+ * @return string[]
+ */
+function calculate_compliance($admission, $date) {
+    log_trace("CALCULATE COMPLIANCE. Admission: $admission, Date: $date");
+    $errorMsg = null;
+
+    try {
+        $resp = calculateCompliance($admission, $date);
         $errorMsg = $resp['ErrorMsg'];
     } catch (APIException $e) {
         $errorMsg = $e->getMessage();
