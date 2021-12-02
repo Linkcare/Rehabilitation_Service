@@ -16,6 +16,7 @@ try {
     $server = new SoapServer("soap_service.wsdl");
     $server->addFunction("training_summary");
     $server->addFunction("calculate_compliance");
+    $server->addFunction("calculate_performance");
 
     $server->handle();
 } catch (APIException $e) {
@@ -42,7 +43,7 @@ try {
  * @return string[]
  */
 function training_summary($admission, $summary_form, $from_date, $to_date) {
-    log_trace("ACTIVITY SUMMARY. Form: $form");
+    log_trace("ACTIVITY SUMMARY. Form: $summary_form, From date: $from_date, To date: $to_date");
     $errorMsg = null;
 
     try {
@@ -101,3 +102,51 @@ function calculate_compliance($admission, $date) {
     return ['result' => $result, 'ErrorMsg' => $errorMsg];
 }
 
+/**
+ * Calculates how the patient is performing his exercises in a date range.
+ * The function returns 2 values:
+ * <ol>
+ * <li>Performance: It is calculated based on the number of completed, expired and pending exercise sessions. Can be one of the following values:
+ * <ul>
+ * <li>NO_DATA: When there are no exercise sessions in the date range</li>
+ * <li>OK: When expired = 0, Closed >= 1, Pending = 0</li>
+ * <li>OK1: When expired = 0, Closed >= 1, Pending = 1</li>
+ * <li>OK2: When expired >= 1, Closed >= 1, Pending = 1</li>
+ * <li>OK3: When expired >= 1, Closed >= 1, Pending = 0</li>
+ * <li>ONE_PENDING: When expired = 0, Closed = 0, Pending = 1</li>
+ * <li>KO: When expired >= 1, Closed = 0, Pending = 1</li>
+ * <li>(empty): When expired >= 1, Closed = 0, Pending = 0 (all expired)</li>
+ * </ul>
+ * </li>
+ * <li>Difficulty: Indicates if the patient foud it difficult to do any of the exercises
+ * <ul>
+ * <li>0: Not difficult</li>
+ * <li>1: Difficult</li>
+ * </ul>
+ * </li>
+ * </ol>
+ *
+ * @param string $admission
+ * @param string $from_date
+ * @param string $to_date
+ * @return string[]
+ */
+function calculate_performance($admission, $from_date, $to_date) {
+    log_trace("CALCULATE PERFORMANCE. Admission: $admission, From date: $from_date, To Date: $to_date");
+    $errorMsg = null;
+
+    try {
+        $resp = calculatePerformance($admission, $from_date, $to_date);
+        $errorMsg = $resp['ErrorMsg'];
+    } catch (APIException $e) {
+        $errorMsg = $e->getMessage();
+    } catch (Exception $e) {
+        $errorMsg = $e->getMessage();
+    }
+
+    $result = $errorMsg ? '' : $resp['result'];
+    if ($errorMsg) {
+        log_trace("ERROR: $errorMsg", 1);
+    }
+    return ['result' => $result, 'ErrorMsg' => $errorMsg];
+}

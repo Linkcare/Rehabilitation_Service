@@ -12,6 +12,16 @@ const EFFORT_MODERATE = 2;
 const EFFORT_HIGH = 3;
 const EFFORT_VERY_HIGH = 4;
 
+// Constants to define the performance of a patient doing the planned exercises
+const PERFORMANCE_NO_DATA = 'NO_DATA';
+const PERFORMANCE_OK = 'OK';
+const PERFORMANCE_OK1 = 'OK1';
+const PERFORMANCE_OK2 = 'OK2';
+const PERFORMANCE_OK3 = 'OK3';
+const PERFORMANCE_ONE_PENDING = 'ONE_PENDING';
+const PERFORMANCE_KO = 'KO';
+const PERFORMANCE_EMPTY = '';
+
 /**
  * Generate a summary of the exercices performed by a patient in a date range
  * The summary is stored in the FORM as an array where each row correponds to a date, and the columns correspond to the exercises performed.
@@ -69,7 +79,7 @@ function trainingSummary($admissionId, $summaryFormId, $fromDate, $toDate) {
  * <li>2 (yellow): Any other case</li>
  * </ul>
  *
- * @param string $admission
+ * @param string $admissionId
  * @param string $date
  * @return string[]
  */
@@ -119,6 +129,98 @@ function calculateCompliance($admissionId, $date) {
 
     return ['result' => COMPLIANCE_YELLOW, 'ErrorMsg' => '', 'ErrorCode' => ''];
 }
+
+/**
+ * Calculates how the patient is performing his exercises in a date range.
+ * The function returns 2 values:
+ * <ol>
+ * <li>Performance: It is calculated based on the number of completed, expired and pending exercise sessions. Can be one of the following values:
+ * <ul>
+ * <li>NO_DATA: When there are no exercise sessions in the date range</li>
+ * <li>OK: When expired = 0, Closed >= 1, Pending = 0</li>
+ * <li>OK1: When expired = 0, Closed >= 1, Pending = 1</li>
+ * <li>OK2: When expired >= 1, Closed >= 1, Pending = 1</li>
+ * <li>OK3: When expired >= 1, Closed >= 1, Pending = 0</li>
+ * <li>ONE_PENDING: When expired = 0, Closed = 0, Pending = 1</li>
+ * <li>KO: When expired >= 1, Closed = 0, Pending = 1</li>
+ * <li>(empty): When expired >= 1, Closed = 0, Pending = 0 (all expired)</li>
+ * </ul>
+ * </li>
+ * <li>Difficulty: Indicates if the patient foud it difficult to do any of the exercises
+ * <ul>
+ * <li>0: Not difficult</li>
+ * <li>1: Difficult</li>
+ * </ul>
+ * </li>
+ * </ol>
+ *
+ * @param string $admissionId
+ * @param string $fromDate
+ * @param string $toDate
+ * @return string[]
+ */
+function calculatePerformance($admissionId, $fromDate, $toDate) {
+    $api = LinkcareSoapAPI::getInstance();
+
+    log_trace("CALCULATE COMPLIANCE . Date: $toDate,  Admission: $admissionId");
+
+    $admission = $api->admission_get($admissionId);
+
+    // Search the training TASKS in the date range specified
+    $filter = new TaskFilter();
+    $filter->setObjectType('TASKS');
+    $filter->setFromDate($fromDate);
+    $filter->setToDate($toDate);
+    $filter->setTaskCodes($GLOBALS['TASK_CODES']['TRAINING_EXERCISES']);
+    // Find the 2 last exercise sessions
+    $trainingTasks = $admission->getTaskList(25, 0, $filter, false);
+    if (count($trainingTasks) == 0) {
+        $result = ['performance' => PERFORMANCE_NO_DATA, 'difficulty' => ''];
+        return ['result' => json_encode($result), 'ErrorMsg' => '', 'ErrorCode' => ''];
+    }
+
+    $effort = EFFORT_UNKNOWN;
+    $closed = 0;
+    $pending = 0;
+    $expired = 0;
+    foreach ($trainingTasks as $t) {
+        if ($t->isCancelled()) {
+            continue;
+        }
+        if ($effort < EFFORT_HIGH) {
+            /* If at least one exercise has been found to be difficult there is no need to examine the effort in the rest of TASKs */
+            $e = extractTrainingEffort($t);
+            if ($e > $effort) {
+                $effort = $e;
+            }
+        }
+        $closed += $t->isClosed() ? 1 : 0;
+        $pending += $t->isOpen() ? 1 : 0;
+        $expired += $t->isExpired() ? 1 : 0;
+    }
+
+    $perf = PERFORMANCE_NO_DATA;
+    if ($expired == 0 && $closed >= 1 && $pending == 0) {
+        $perf = PERFORMANCE_OK;
+    } elseif ($expired == 0 && $closed >= 1 && $pending == 1) {
+        $perf = PERFORMANCE_OK1;
+    } elseif ($expired >= 1 && $closed >= 1 && $pending == 1) {
+        $perf = PERFORMANCE_OK2;
+    } elseif ($expired >= 1 && $closed >= 1 && $pending == 0) {
+        $perf = PERFORMANCE_OK3;
+    } elseif ($expired == 0 && $closed == 0 && $pending == 1) {
+        $perf = PERFORMANCE_ONE_PENDING;
+    } elseif ($expired >= 1 && $closed == 0 && $pending == 1) {
+        $perf = PERFORMANCE_KO;
+    } elseif ($expired >= 1 && $closed == 0 && $pending == 0) {
+        $perf = PERFORMANCE_EMPTY;
+    }
+
+    $result = ['performance' => $perf, 'difficulty' => ($effort < EFFORT_HIGH ? 0 : 1)];
+    return ['result' => json_encode($result), 'ErrorMsg' => '', 'ErrorCode' => ''];
+}
+
+/* ************************************* INTERNAL FUNCTIONS ************************************* */
 
 /**
  *
