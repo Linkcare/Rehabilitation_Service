@@ -96,7 +96,7 @@ class LinkcareSoapAPI {
         }
 
         $date = currentDate($timezone);
-        $result = $client->session_init($user, $password, null, null, null, '2.7.20', $reuseExistingSession ? 1 : 0, $date);
+        $result = $client->session_init($user, $password, null, null, null, '2.7.32', $reuseExistingSession ? 1 : 0, $date);
         if ($result["ErrorCode"]) {
             throw new APIException($result["ErrorCode"], $result["ErrorMsg"]);
         } else {
@@ -406,7 +406,7 @@ class LinkcareSoapAPI {
     /**
      *
      * @param string $caseId
-     * @return APIContact
+     * @return APICase
      */
     public function case_get($caseId, $admissionId = null) {
         $case = null;
@@ -578,8 +578,8 @@ class LinkcareSoapAPI {
         $simpleQuestions = [];
         $arrayQuestions = [];
         foreach ($questions as $q) {
-            if ($q->getRow()) {
-                $arrayQuestions[$q->getOrder()][$q->getRow()][] = $q;
+            if ($q->getArrayRef()) {
+                $arrayQuestions[$q->getArrayRef()][$q->getRow()][] = $q;
             } else {
                 $simpleQuestions[] = $q;
             }
